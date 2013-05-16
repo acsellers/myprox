@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net"
-	"time"
 )
 
 const (
@@ -66,8 +65,7 @@ func proxify(conn net.Conn) {
 }
 
 func forward(src, sink net.Conn) {
-	buffer := make([]byte, 16777219)
-	src.SetDeadline(time.Time{})
+	buffer := make([]byte, 1024)
 	for {
 		n, err := src.Read(buffer)
 		if err != nil {
@@ -89,7 +87,6 @@ func forward(src, sink net.Conn) {
 
 func forwardWithLog(src, sink net.Conn) {
 	buffer := make([]byte, 16777219)
-	src.SetDeadline(time.Time{})
 	for {
 		n, err := src.Read(buffer)
 		if err != nil {
