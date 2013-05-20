@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net"
 )
@@ -59,27 +60,24 @@ func proxify(conn net.Conn) {
 		log.Println("Could not dial server")
 		log.Println(err)
 		conn.Close()
+		return
 	}
-	go forwardWithLog(conn, server)
 	go forward(server, conn)
+	forwardWithLog(conn, server)
+	server.Close()
+	conn.Close()
 }
 
 func forward(src, sink net.Conn) {
 	buffer := make([]byte, 1024)
 	for {
 		n, err := src.Read(buffer)
-		if err != nil {
-			sink.Close()
-			log.Println("Could not read from source")
-			log.Println(err)
+		if err != nil && err != io.EOF {
 			return
 		}
 
 		_, err = sink.Write(buffer[0:n])
-		if err != nil {
-			sink.Close()
-			log.Println("Could not write to sink")
-			log.Println(err)
+		if err != nil && err != io.EOF {
 			return
 		}
 	}
@@ -89,32 +87,28 @@ func forwardWithLog(src, sink net.Conn) {
 	buffer := make([]byte, 16777219)
 	for {
 		n, err := src.Read(buffer)
-		if err != nil {
-			sink.Close()
-			log.Println("Could not read from source")
-			log.Println(err)
+		if err != nil && err != io.EOF {
 			return
 		}
 
-		switch buffer[4] {
-		case comQuery:
-			log.Printf("Query: %s\n", string(buffer[5:n]))
-		case comStmtPrepare:
-			log.Printf("Prepare Query: %s\n", string(buffer[5:n]))
-		}
+		if n >= 5 {
+			switch buffer[4] {
+			case comQuery:
+				log.Printf("Query: %s\n", string(buffer[5:n]))
+			case comStmtPrepare:
+				log.Printf("Prepare Query: %s\n", string(buffer[5:n]))
+			}
 
-		switch buffer[11] {
-		case comQuery:
-			log.Printf("Query: %s\n", string(buffer[12:n]))
-		case comStmtPrepare:
-			log.Printf("Prepare Query: %s\n", string(buffer[12:n]))
+			switch buffer[11] {
+			case comQuery:
+				log.Printf("Query: %s\n", string(buffer[12:n]))
+			case comStmtPrepare:
+				log.Printf("Prepare Query: %s\n", string(buffer[12:n]))
+			}
 		}
 
 		_, err = sink.Write(buffer[0:n])
-		if err != nil {
-			sink.Close()
-			log.Println("Could not write to sink")
-			log.Println(err)
+		if err != nil && err != io.EOF {
 			return
 		}
 	}
